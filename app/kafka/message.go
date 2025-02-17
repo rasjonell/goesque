@@ -1,6 +1,9 @@
 package kafka
 
-import "log"
+import (
+	"encoding/binary"
+	"log"
+)
 
 type Message struct {
 	Size int32
@@ -15,6 +18,8 @@ func (h *Message) Bytes() []byte {
 	return bytes
 }
 
-func NewMessage( /*size int32*/ ) *Message {
-	return &Message{Size: 0}
+func NewMessage(sizeBuffer []byte) *Message {
+	return &Message{
+		Size: int32(binary.BigEndian.Uint32(sizeBuffer)),
+	}
 }

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
+	"unsafe"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/kafka"
 )
@@ -19,17 +19,21 @@ func main() {
 		log.Fatal("Error accepting connection: ", err.Error())
 	}
 
-	msg := kafka.NewMessage().Bytes()
-	header := kafka.NewHeader().Bytes()
+	msg := &kafka.Message{}
+	messageSizeBuffer := make([]byte, unsafe.Sizeof(msg))
+	conn.Read(messageSizeBuffer)
+	msg = kafka.NewMessage(messageSizeBuffer)
 
-	totalLength := len(msg) + len(header)
+	requestBuffer := make([]byte, msg.Size)
+	conn.Read(requestBuffer)
+	header := kafka.NewHeader(requestBuffer)
+
+	totalLength := len(msg.Bytes()) + len(header.Bytes())
 	response := make([]byte, totalLength)
 
-	fmt.Printf("%+v\n%+v\n", msg, header)
-
 	offset := 0
-	offset += copy(response[offset:], msg)
-	offset += copy(response[offset:], header)
+	offset = copy(response[offset:], msg.Bytes())
+	offset = copy(response[offset:], header.Bytes())
 
 	conn.Write(response)
 }

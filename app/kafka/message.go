@@ -2,24 +2,30 @@ package kafka
 
 import (
 	"encoding/binary"
-	"log"
+	"reflect"
 )
 
-type Message struct {
+type SizeMessage struct {
 	Size int32
 }
 
-func (h *Message) Bytes() []byte {
-	bytes, err := ToBytes(h)
-	if err != nil {
-		log.Fatalf("Error converting message to bytes: %v", err)
-	}
+func (h *SizeMessage) Bytes() []byte {
+	msgType := reflect.TypeOf(*h)
+	size := int(msgType.Size())
 
-	return bytes
+	b := make([]byte, size)
+	binary.BigEndian.PutUint32(b[0:4], uint32(h.Size))
+	return b
 }
 
-func NewMessage(sizeBuffer []byte) *Message {
-	return &Message{
+func NewSizeMessageFromBuffer(sizeBuffer []byte) *SizeMessage {
+	return &SizeMessage{
 		Size: int32(binary.BigEndian.Uint32(sizeBuffer)),
+	}
+}
+
+func NewSizeMessage(size int32) *SizeMessage {
+	return &SizeMessage{
+		Size: size,
 	}
 }

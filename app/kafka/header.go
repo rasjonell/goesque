@@ -2,11 +2,20 @@ package kafka
 
 import (
 	"encoding/binary"
-	"log"
+	"reflect"
 )
 
 type HeaderV0 struct {
 	CorrelationId int32
+}
+
+func (h *HeaderV0) Bytes() []byte {
+	headerType := reflect.TypeOf(*h)
+	size := int(headerType.Size())
+
+	b := make([]byte, size)
+	binary.BigEndian.PutUint32(b[0:4], uint32(h.CorrelationId))
+	return b
 }
 
 type NullableString struct {
@@ -22,29 +31,22 @@ type HeaderV2 struct {
 	// TagBuffer []byte
 }
 
-func (h *HeaderV0) Bytes() []byte {
-	bytes, err := ToBytes(h)
-	if err != nil {
-		log.Fatalf("Error converting header to bytes: %v", err)
-	}
-
-	return bytes
-}
-
 func (h *HeaderV2) Bytes() []byte {
-	bytes, err := ToBytes(h)
-	if err != nil {
-		log.Fatalf("Error converting header to bytes: %v", err)
-	}
+	headerType := reflect.TypeOf(*h)
+	size := int(headerType.Size())
 
-	return bytes
+	b := make([]byte, size)
+	binary.BigEndian.PutUint16(b[0:2], uint16(h.RequestApiKey))
+	binary.BigEndian.PutUint16(b[2:4], uint16(h.RequestApiVersion))
+	binary.BigEndian.PutUint32(b[4:8], uint32(h.CorrelationId))
+	return b
 }
 
 func NewHeader(headerBuffer []byte) *HeaderV2 {
 	header := &HeaderV2{}
 	header.RequestApiKey = int16(binary.BigEndian.Uint16(headerBuffer[0:2]))
 	header.RequestApiVersion = int16(binary.BigEndian.Uint16(headerBuffer[2:4]))
-	header.CorrelationId = int32(binary.BigEndian.Uint32(headerBuffer[4:12]))
+	header.CorrelationId = int32(binary.BigEndian.Uint32(headerBuffer[4:8]))
 
 	return header
 }

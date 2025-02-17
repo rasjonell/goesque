@@ -19,21 +19,15 @@ func main() {
 		log.Fatal("Error accepting connection: ", err.Error())
 	}
 
-	msg := &kafka.Message{}
-	messageSizeBuffer := make([]byte, unsafe.Sizeof(msg))
+	messageSizeBuffer := make([]byte, unsafe.Sizeof(kafka.SizeMessage{}))
 	conn.Read(messageSizeBuffer)
-	msg = kafka.NewMessage(messageSizeBuffer)
+	msg := kafka.NewSizeMessageFromBuffer(messageSizeBuffer)
 
 	requestBuffer := make([]byte, msg.Size)
 	conn.Read(requestBuffer)
 	header := kafka.NewHeader(requestBuffer)
 
-	totalLength := len(msg.Bytes()) + len(header.Bytes())
-	response := make([]byte, totalLength)
-
-	offset := 0
-	offset = copy(response[offset:], msg.Bytes())
-	offset = copy(response[offset:], header.Bytes())
+	response := kafka.GenerateResponse(header)
 
 	conn.Write(response)
 }

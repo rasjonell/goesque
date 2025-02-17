@@ -15,11 +15,8 @@ type ApiVersionsBody struct {
 	ThrottleTimeMs int32
 	ErrorCode      int16
 	ApiKeysLength  byte
-	TagBuffer      byte
 	TagLine        byte
 }
-
-const PADDING = 3
 
 var supportedApiKeys []ApiKey = []ApiKey{
 	{
@@ -27,11 +24,18 @@ var supportedApiKeys []ApiKey = []ApiKey{
 		MaxVersion: 4,
 		ApiKey:     API_ApiVersions,
 	},
+	{
+		MinVersion: 0,
+		MaxVersion: 0,
+		ApiKey:     API_DescribeTopicPartitions,
+	},
 }
 
 func (a *ApiVersionsBody) Bytes() []byte {
 	bodyType := reflect.TypeOf(*a)
-	size := int(bodyType.Size()) - PADDING + int(a.ApiKeysLength*6)
+	apiKeyType := reflect.TypeOf(supportedApiKeys[0])
+	// ApiVersionBody(4 + 2 + 1 + 1 = 8 bytes) + (# of supported API Keys * ApiKey(2 + 2 + 2 = 6) + 1(single TagBuffer byte))
+	size := int(a.ApiKeysLength)*(int(apiKeyType.Size())+1) + int(bodyType.Size())
 
 	b := make([]byte, size)
 	offset := 0
@@ -49,11 +53,10 @@ func (a *ApiVersionsBody) Bytes() []byte {
 			offset += 2
 			binary.BigEndian.PutUint16(b[offset:], uint16(apiKey.MaxVersion))
 			offset += 2
+			b[offset] = 0 // TagBuffer
+			offset += 1
 		}
 	}
-
-	b[offset] = a.TagBuffer
-	offset += 1
 
 	binary.BigEndian.PutUint32(b[offset:], uint32(a.ThrottleTimeMs))
 	offset += 4
@@ -67,7 +70,6 @@ func NewApiVersionsBody(h *HeaderV2) *ApiVersionsBody {
 		return &ApiVersionsBody{
 			ThrottleTimeMs: 0,
 			ApiKeysLength:  0,
-			TagBuffer:      0,
 			TagLine:        0,
 			ErrorCode:      ERROR_UNSUPPORTED_VERSION,
 		}
@@ -75,7 +77,6 @@ func NewApiVersionsBody(h *HeaderV2) *ApiVersionsBody {
 
 	return &ApiVersionsBody{
 		ThrottleTimeMs: 0,
-		TagBuffer:      0,
 		TagLine:        0,
 		ErrorCode:      ERROR_NONE,
 		ApiKeysLength:  byte(len(supportedApiKeys)),

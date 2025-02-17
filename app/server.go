@@ -14,20 +14,38 @@ func main() {
 		log.Fatal("Failed to bind to port 9092")
 	}
 
-	conn, err := l.Accept()
-	if err != nil {
-		log.Fatal("Error accepting connection: ", err.Error())
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Printf("Error accepting connection: %v", err)
+			continue
+		}
+		go handleRequest(conn)
 	}
+}
 
-	messageSizeBuffer := make([]byte, unsafe.Sizeof(kafka.SizeMessage{}))
-	conn.Read(messageSizeBuffer)
-	msg := kafka.NewSizeMessageFromBuffer(messageSizeBuffer)
+func handleRequest(conn net.Conn) {
+	defer conn.Close()
+	log.Println("Handling connection from", conn.RemoteAddr())
 
-	requestBuffer := make([]byte, msg.Size)
-	conn.Read(requestBuffer)
-	header := kafka.NewHeader(requestBuffer)
+	for {
+		messageSizeBuffer := make([]byte, unsafe.Sizeof(kafka.SizeMessage{}))
+		conn.Read(messageSizeBuffer)
+		msg := kafka.NewSizeMessageFromBuffer(messageSizeBuffer)
 
-	response := kafka.GenerateResponse(header)
+		requestBuffer := make([]byte, msg.Size)
+		n, err := conn.Read(requestBuffer)
+		if err != nil {
+			log.Println("Read error:", err)
+			return
+		}
+		if n == 0 {
+			break
+		}
 
-	conn.Write(response)
+		header := kafka.NewHeader(requestBuffer)
+
+		response := kafka.GenerateResponse(header)
+		conn.Write(response)
+	}
 }
